@@ -441,12 +441,18 @@ export class Crawler {
   async bootstrap() {
     const subprocesses: ChildProcess[] = [];
 
-    subprocesses.push(this.launchRedis());
+    process.on("exit", () => {
+      for (const proc of subprocesses) {
+        proc.kill();
+      }
+    });
 
     await fsp.mkdir(this.logDir, { recursive: true });
     await fsp.mkdir(this.archivesDir, { recursive: true });
     await fsp.mkdir(this.tempdir, { recursive: true });
     await fsp.mkdir(this.tempCdxDir, { recursive: true });
+
+    subprocesses.push(this.launchRedis());
 
     this.logFH = fs.createWriteStream(this.logFilename, { flags: "a" });
     logger.setExternalLogStream(this.logFH);
@@ -477,33 +483,31 @@ export class Crawler {
 
     this.headers = { "User-Agent": this.configureUA() };
 
-    process.on("exit", () => {
-      for (const proc of subprocesses) {
-        proc.kill();
-      }
-    });
-
-    child_process.spawn(
-      "socat",
-      ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"],
-      { detached: RUN_DETACHED },
+    subprocesses.push(
+      child_process.spawn(
+        "socat",
+        ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"],
+        { detached: RUN_DETACHED },
+      ),
     );
 
     if (!this.params.headless && !process.env.NO_XVFB) {
-      child_process.spawn(
-        "Xvfb",
-        [
-          process.env.DISPLAY || "",
-          "-listen",
-          "tcp",
-          "-screen",
-          "0",
-          process.env.GEOMETRY || "",
-          "-ac",
-          "+extension",
-          "RANDR",
-        ],
-        { detached: RUN_DETACHED },
+      subprocesses.push(
+        child_process.spawn(
+          "Xvfb",
+          [
+            process.env.DISPLAY || "",
+            "-listen",
+            "tcp",
+            "-screen",
+            "0",
+            process.env.GEOMETRY || "",
+            "-ac",
+            "+extension",
+            "RANDR",
+          ],
+          { detached: RUN_DETACHED },
+        ),
       );
     }
 
