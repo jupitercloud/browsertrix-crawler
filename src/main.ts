@@ -1,10 +1,12 @@
 #!/usr/bin/env -S node --experimental-global-webcrypto
 
+import path from "path";
 import { logger } from "./util/logger.js";
 import { parseArgs } from "./util/argParser.js";
 import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
 import { ReplayCrawler } from "./replaycrawler.js";
+import { CrawlSupport } from "./crawlsupport.js";
 
 let crawler: Crawler | null = null;
 
@@ -42,6 +44,10 @@ async function handleTerminate(signame: string) {
   }
 }
 
+const args = parseArgs();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const params = args.parsed as any;
+
 process.on("SIGINT", () => handleTerminate("SIGINT"));
 
 process.on("SIGTERM", () => handleTerminate("SIGTERM"));
@@ -51,11 +57,31 @@ process.on("SIGABRT", async () => {
   forceTerm = true;
 });
 
-const args = parseArgs();
+// Write supporting service logs to collection log directory
+const crawlSupportLogDir = path.join(
+  params.cwd,
+  "collections",
+  params.collection,
+  "logs",
+);
+
+const crawlSupport = new CrawlSupport({
+  debugAccessRedis: params.debugAccessRedis,
+  headless: params.headless,
+  logging: params.logging,
+  logDir: crawlSupportLogDir,
+});
+
+process.on("exit", () => {
+  crawlSupport.shutdown();
+});
+
+await crawlSupport.initialize();
+
 if (process.argv[1].endsWith("qa")) {
-  crawler = new ReplayCrawler(args.parsed, args.origConfig);
+  crawler = new ReplayCrawler(params, args.origConfig, crawlSupport);
 } else {
-  crawler = new Crawler(args.parsed, args.origConfig);
+  crawler = new Crawler(params, args.origConfig, crawlSupport);
 }
 
 crawler.run();

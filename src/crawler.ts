@@ -1,4 +1,4 @@
-import child_process, { ChildProcess, StdioOptions } from "child_process";
+import child_process, { ChildProcess } from "child_process";
 import path from "path";
 import fs, { WriteStream } from "fs";
 import os from "os";
@@ -59,6 +59,7 @@ import { Recorder } from "./util/recorder.js";
 import { SitemapReader } from "./util/sitemapper.js";
 import { ScopedSeed } from "./util/seeds.js";
 import { WARCWriter } from "./util/warcwriter.js";
+import { CrawlSupport } from "./crawlsupport.js";
 
 const HTTPS_AGENT = new HTTPSAgent({
   rejectUnauthorized: false,
@@ -77,8 +78,6 @@ const behaviors = fs.readFileSync(
 const FETCH_TIMEOUT_SECS = 30;
 const PAGE_OP_TIMEOUT_SECS = 5;
 const SITEMAP_INITIAL_FETCH_TIMEOUT_SECS = 30;
-
-const RUN_DETACHED = process.env.DETACHED_CHILD_PROC == "1";
 
 const POST_CRAWL_STATES = [
   "generate-wacz",
@@ -187,11 +186,13 @@ export class Crawler {
   }) => NonNullable<unknown>;
 
   recording = true;
+  crawlSupport: CrawlSupport;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(params: any, origConfig: any) {
+  constructor(params: any, origConfig: any, crawlSupport: CrawlSupport) {
     this.params = params;
     this.origConfig = origConfig;
+    this.crawlSupport = crawlSupport;
 
     // root collections dir
     this.collDir = path.join(
@@ -416,43 +417,11 @@ export class Crawler {
     return new ScreenCaster(transport, this.params.workers);
   }
 
-  launchRedis() {
-    let redisStdio: StdioOptions;
-
-    if (this.params.logging.includes("redis")) {
-      const redisStderr = fs.openSync(path.join(this.logDir, "redis.log"), "a");
-      redisStdio = [process.stdin, redisStderr, redisStderr];
-    } else {
-      redisStdio = "ignore";
-    }
-
-    let redisArgs: string[] = [];
-    if (this.params.debugAccessRedis) {
-      redisArgs = ["--protected-mode", "no"];
-    }
-
-    return child_process.spawn("redis-server", redisArgs, {
-      cwd: "/tmp/",
-      stdio: redisStdio,
-      detached: RUN_DETACHED,
-    });
-  }
-
   async bootstrap() {
-    const subprocesses: ChildProcess[] = [];
-
-    process.on("exit", () => {
-      for (const proc of subprocesses) {
-        proc.kill();
-      }
-    });
-
     await fsp.mkdir(this.logDir, { recursive: true });
     await fsp.mkdir(this.archivesDir, { recursive: true });
     await fsp.mkdir(this.tempdir, { recursive: true });
     await fsp.mkdir(this.tempCdxDir, { recursive: true });
-
-    subprocesses.push(this.launchRedis());
 
     this.logFH = fs.createWriteStream(this.logFilename, { flags: "a" });
     logger.setExternalLogStream(this.logFH);
@@ -482,34 +451,6 @@ export class Crawler {
     }
 
     this.headers = { "User-Agent": this.configureUA() };
-
-    subprocesses.push(
-      child_process.spawn(
-        "socat",
-        ["tcp-listen:9222,reuseaddr,fork", "tcp:localhost:9221"],
-        { detached: RUN_DETACHED },
-      ),
-    );
-
-    if (!this.params.headless && !process.env.NO_XVFB) {
-      subprocesses.push(
-        child_process.spawn(
-          "Xvfb",
-          [
-            process.env.DISPLAY || "",
-            "-listen",
-            "tcp",
-            "-screen",
-            "0",
-            process.env.GEOMETRY || "",
-            "-ac",
-            "+extension",
-            "RANDR",
-          ],
-          { detached: RUN_DETACHED },
-        ),
-      );
-    }
 
     if (this.params.screenshot) {
       this.screenshotWriter = this.createExtraResourceWarcWriter("screenshots");
@@ -1568,7 +1509,9 @@ self.__bx_behaviors.selectMainBehavior();
 
     // create WACZ
     const waczResult = await this.awaitProcess(
-      child_process.spawn("wacz", createArgs, { detached: RUN_DETACHED }),
+      child_process.spawn("wacz", createArgs, {
+        detached: this.crawlSupport.runDetached,
+      }),
     );
 
     if (waczResult !== 0) {
