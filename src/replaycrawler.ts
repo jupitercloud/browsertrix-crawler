@@ -26,6 +26,7 @@ import { MAX_URL_LENGTH } from "./util/reqresp.js";
 import fs from "fs";
 import { WARCWriter } from "./util/warcwriter.js";
 import { parseRx } from "./util/seeds.js";
+import { CrawlSupport } from "./crawlsupport.js";
 
 // RWP Replay Prefix
 const REPLAY_PREFIX = "http://localhost:9990/replay/w/replay/";
@@ -88,8 +89,8 @@ export class ReplayCrawler extends Crawler {
   counter: number = 0;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(params: any, origConfig: any) {
-    super(params, origConfig);
+  constructor(params: any, origConfig: any, crawlSupport: CrawlSupport) {
+    super(params, origConfig, crawlSupport);
     this.recording = false;
     if (!this.params.qaSource) {
       throw new Error("Missing QA source");
