@@ -12,8 +12,6 @@ import {
   WorkerId,
 } from "./util/state.js";
 
-import { parseArgs } from "./util/argParser.js";
-
 import yaml from "js-yaml";
 
 import * as warcio from "warcio";
@@ -190,10 +188,10 @@ export class Crawler {
 
   recording = true;
 
-  constructor() {
-    const args = this.parseArgs();
-    this.params = args.parsed;
-    this.origConfig = args.origConfig;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(params: any, origConfig: any) {
+    this.params = params;
+    this.origConfig = origConfig;
 
     // root collections dir
     this.collDir = path.join(
@@ -296,10 +294,6 @@ export class Crawler {
     this.customBehaviors = "";
 
     this.browser = new Browser();
-  }
-
-  protected parseArgs() {
-    return parseArgs();
   }
 
   configureUA() {

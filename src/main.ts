@@ -1,6 +1,7 @@
 #!/usr/bin/env -S node --experimental-global-webcrypto
 
 import { logger } from "./util/logger.js";
+import { parseArgs } from "./util/argParser.js";
 import { setExitOnRedisError } from "./util/redis.js";
 import { Crawler } from "./crawler.js";
 import { ReplayCrawler } from "./replaycrawler.js";
@@ -50,10 +51,11 @@ process.on("SIGABRT", async () => {
   forceTerm = true;
 });
 
+const args = parseArgs();
 if (process.argv[1].endsWith("qa")) {
-  crawler = new ReplayCrawler();
+  crawler = new ReplayCrawler(args.parsed, args.origConfig);
 } else {
-  crawler = new Crawler();
+  crawler = new Crawler(args.parsed, args.origConfig);
 }
 
 crawler.run();

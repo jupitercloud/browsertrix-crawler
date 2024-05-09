@@ -87,8 +87,9 @@ export class ReplayCrawler extends Crawler {
   // for qaDebugImageDiff incremental file output
   counter: number = 0;
 
-  constructor() {
-    super();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(params: any, origConfig: any) {
+    super(params, origConfig);
     this.recording = false;
     if (!this.params.qaSource) {
       throw new Error("Missing QA source");
