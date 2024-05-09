@@ -23,7 +23,7 @@ import pixelmatch from "pixelmatch";
 
 import levenshtein from "js-levenshtein";
 import { MAX_URL_LENGTH } from "./util/reqresp.js";
-import { openAsBlob } from "fs";
+import fs from "fs";
 import { WARCWriter } from "./util/warcwriter.js";
 import { parseRx } from "./util/seeds.js";
 
@@ -60,6 +60,14 @@ type ComparisonData = {
 type ReplayPageInfoRecord = PageInfoRecord & ComparisonData;
 
 type ComparisonPageState = PageState & ComparisonData;
+
+// openAsBlob polyfill for node <= 18
+function openAsBlob(path: string) {
+  if (fs.openAsBlob) return fs.openAsBlob(path);
+  const data = fs.readFileSync(path);
+  const blob = new Blob([data], { type: "application/octet-stream" });
+  return blob;
+}
 
 // ============================================================================
 // Crawler designed to run over replay of existing WACZ files to generate comparison
