@@ -3,22 +3,36 @@ import fsp from "fs/promises";
 import http, { IncomingMessage, ServerResponse } from "http";
 import path from "path";
 
-const replayHTML = fs.readFileSync(
-  new URL("../../html/replay.html", import.meta.url),
-  { encoding: "utf8" },
+function memoize<T>(f: () => T): () => T {
+  const cache = { value: null as T };
+  return () => {
+    if (!cache.value) {
+      cache.value = f();
+    }
+    return cache.value;
+  };
+}
+
+const replayHTML = memoize(() =>
+  fs.readFileSync(new URL("../../html/replay.html", import.meta.url), {
+    encoding: "utf8",
+  }),
 );
 
-const swJS = fs.readFileSync(new URL("../../html/rwp/sw.js", import.meta.url), {
-  encoding: "utf8",
-});
+const swJS = memoize(() =>
+  fs.readFileSync(new URL("../../html/rwp/sw.js", import.meta.url), {
+    encoding: "utf8",
+  }),
+);
 
-const uiJS = fs.readFileSync(new URL("../../html/rwp/ui.js", import.meta.url), {
-  encoding: "utf8",
-});
+const uiJS = memoize(() =>
+  fs.readFileSync(new URL("../../html/rwp/ui.js", import.meta.url), {
+    encoding: "utf8",
+  }),
+);
 
-const adblockGZ = fs.readFileSync(
-  new URL("../../html/rwp/adblock.gz", import.meta.url),
-  {},
+const adblockGZ = memoize(() =>
+  fs.readFileSync(new URL("../../html/rwp/adblock.gz", import.meta.url), {}),
 );
 
 // ============================================================================
@@ -77,23 +91,23 @@ export class ReplayServer {
     switch (pathname) {
       case "/":
         response.writeHead(200, { "Content-Type": "text/html" });
-        response.end(replayHTML.replace("$SOURCE", this.sourceUrl));
+        response.end(replayHTML().replace("$SOURCE", this.sourceUrl));
         return;
 
       case "/sw.js":
       case "/replay/sw.js":
         response.writeHead(200, { "Content-Type": "application/javascript" });
-        response.end(swJS);
+        response.end(swJS());
         return;
 
       case "/ui.js":
         response.writeHead(200, { "Content-Type": "application/javascript" });
-        response.end(uiJS);
+        response.end(uiJS());
         return;
 
       case "/replay/adblock/adblock.gz":
         response.writeHead(200, { "Content-Type": "application/gzip" });
-        response.end(adblockGZ);
+        response.end(adblockGZ());
         return;
 
       case this.sourceUrl:
