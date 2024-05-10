@@ -244,7 +244,7 @@ export class PageWorker {
       }
     }
 
-    throw new Error("no page available, shouldn't get here");
+    throw new Error("Crawler was stopped");
   }
 
   async crawlPage(opts: WorkerState) {

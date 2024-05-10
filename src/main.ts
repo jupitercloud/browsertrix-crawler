@@ -4,6 +4,7 @@ import path from "path";
 import { logger } from "./util/logger.js";
 import { parseArgs } from "./util/argParser.js";
 import { setExitOnRedisError } from "./util/redis.js";
+import type { CrawlError, CrawlResult } from "./crawler.js";
 import { Crawler } from "./crawler.js";
 import { ReplayCrawler } from "./replaycrawler.js";
 import { CrawlSupport } from "./crawlsupport.js";
@@ -28,14 +29,16 @@ async function handleTerminate(signame: string) {
   setExitOnRedisError();
 
   try {
-    crawler.checkCanceled();
+    if (await crawler.isCanceled()) {
+      process.exit(0);
+    }
 
     if (!crawler.interrupted) {
       logger.info("SIGNAL: gracefully finishing current pages...");
       crawler.gracefulFinishOnInterrupt();
     } else if (forceTerm || Date.now() - lastSigInt > 200) {
       logger.info("SIGNAL: stopping crawl now...");
-      await crawler.serializeAndExit();
+      await crawler.serializeAndAbort();
     }
     lastSigInt = Date.now();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,4 +91,12 @@ if (process.argv[1].endsWith("qa")) {
   crawler = new Crawler(params, args.origConfig, crawlSupport);
 }
 
-crawler.run();
+crawler
+  .run()
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  .then((_result: CrawlResult) => {
+    process.exit(0);
+  })
+  .catch((error: CrawlError) => {
+    process.exit(error.exitCode);
+  });
