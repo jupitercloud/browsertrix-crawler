@@ -2,13 +2,17 @@ import child_process, { ChildProcess, StdioOptions } from "child_process";
 import path from "path";
 import fs from "fs";
 import fsp from "fs/promises";
-import { logger } from "./util/logger.js";
+import { LogContext, logger } from "./util/logger.js";
 
 export interface CrawlSupportParams {
   debugAccessRedis: boolean;
   headless: boolean;
   logging: string[];
   logDir: string;
+  logLevel: string[];
+  logContext: LogContext[];
+  logExcludeContext: LogContext[];
+  restartsOnError: boolean;
 }
 
 /** Support services for crawling */
@@ -48,8 +52,24 @@ export class CrawlSupport {
     });
   }
 
+  private _initializeLogging() {
+    const debugLogging = this.params.logging.includes("debug");
+    logger.setDebugLogging(debugLogging);
+    logger.setLogLevel(this.params.logLevel);
+    logger.setContext(this.params.logContext);
+    logger.setExcludeContext(this.params.logExcludeContext);
+
+    // if automatically restarts on error exit code,
+    // exit with 0 from fatal by default, to avoid unnecessary restart
+    // otherwise, exit with default fatal exit code
+    if (this.params.restartsOnError) {
+      logger.setDefaultFatalExitCode(0);
+    }
+  }
+
   async initialize() {
-    logger.info("Initializing CrawlSupport", {}, "general");
+    this._initializeLogging();
+    logger.debug("Initializing CrawlSupport", {}, "general");
     await fsp.mkdir(this.params.logDir, { recursive: true });
     this.subprocesses.push(this.launchRedis());
 
@@ -83,7 +103,7 @@ export class CrawlSupport {
   }
 
   async shutdown() {
-    logger.info("Shutting down CrawlSupport", {}, "general");
+    logger.debug("Shutting down CrawlSupport", {}, "general");
     for (const proc of this.subprocesses) {
       proc.kill();
     }
