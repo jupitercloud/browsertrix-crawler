@@ -3,7 +3,6 @@
 import path from "path";
 import { logger } from "./util/logger.js";
 import { parseArgs } from "./util/argParser.js";
-import { setExitOnRedisError } from "./util/redis.js";
 import type { CrawlError, CrawlResult } from "./crawler.js";
 import { Crawler } from "./crawler.js";
 import { ReplayCrawler } from "./replaycrawler.js";
@@ -25,8 +24,6 @@ async function handleTerminate(signame: string) {
     logger.info("success: crawler done, exiting");
     process.exit(0);
   }
-
-  setExitOnRedisError();
 
   try {
     if (await crawler.isCanceled()) {
