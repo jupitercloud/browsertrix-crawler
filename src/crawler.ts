@@ -1,3 +1,4 @@
+import assert from "assert";
 import child_process, { ChildProcess } from "child_process";
 import path from "path";
 import fs, { WriteStream } from "fs";
@@ -99,6 +100,15 @@ type PageEntry = {
   status?: number;
 };
 
+export interface CrawlResult {
+  // The crawl ran to completion. If not, it was gracefully stopped.
+  finished: boolean;
+}
+
+export interface CrawlError extends Error {
+  exitCode: number;
+}
+
 // ============================================================================
 export class Crawler {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -187,6 +197,13 @@ export class Crawler {
 
   recording = true;
   crawlSupport: CrawlSupport;
+
+  private _resolve: (r: CrawlResult) => void = undefined as unknown as (
+    r: CrawlResult,
+  ) => void;
+  private _reject: (r: CrawlError) => void = undefined as unknown as (
+    r: CrawlError,
+  ) => void;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(params: any, origConfig: any, crawlSupport: CrawlSupport) {
@@ -455,38 +472,42 @@ export class Crawler {
     return args;
   }
 
-  async run() {
+  async _runAsync() {
     await this.bootstrap();
-
-    let status = "done";
-    let exitCode = 0;
 
     try {
       await this.crawl();
       const finished = await this.crawlState.isFinished();
       const stopped = await this.crawlState.isCrawlStopped();
       const canceled = await this.crawlState.isCrawlCanceled();
-      if (!finished) {
-        if (canceled) {
-          status = "canceled";
-        } else if (stopped) {
-          status = "done";
+      if (finished || stopped || canceled) {
+        if (stopped) {
           logger.info("Crawl gracefully stopped on request");
-        } else if (this.interrupted) {
-          status = "interrupted";
-          exitCode = 11;
+        }
+        await this._complete({ finished });
+      } else {
+        if (this.interrupted) {
+          await this._setStatusAndFail(11, "interrupted");
+        } else {
+          await this._setStatusAndFail(12, "unknown");
         }
       }
     } catch (e) {
       logger.error("Crawl failed", e);
-      exitCode = 9;
-      status = "failing";
+      let status = "failing";
       if (await this.crawlState.incFailCount()) {
         status = "failed";
       }
-    } finally {
-      await this.setStatusAndExit(exitCode, status);
+      await this._setStatusAndFail(9, status);
     }
+  }
+
+  async run(): Promise<CrawlResult> {
+    return new Promise<CrawlResult>((resolve, reject) => {
+      this._resolve = resolve;
+      this._reject = reject;
+      this._runAsync();
+    });
   }
 
   _behaviorLog(
@@ -1107,43 +1128,49 @@ self.__bx_behaviors.selectMainBehavior();
     }
   }
 
-  async checkCanceled() {
-    if (this.crawlState && (await this.crawlState.isCrawlCanceled())) {
-      await this.setStatusAndExit(0, "canceled");
-    }
+  async isCanceled(): Promise<boolean> {
+    return this.crawlState && (await this.crawlState.isCrawlCanceled());
   }
 
-  async setStatusAndExit(exitCode: number, status: string) {
-    logger.info(`Exiting, Crawl status: ${status}`);
+  private async _complete(result: CrawlResult): Promise<void> {
+    await this.closeLog();
+    this._resolve(result);
+  }
+
+  async _setStatusAndFail(exitCode: number, status: string): Promise<void> {
+    assert(exitCode != 0);
+    logger.info(`Failing, Crawl status: ${status}`);
 
     await this.closeLog();
 
     if (this.crawlState && status) {
       await this.crawlState.setStatus(status);
     }
-    process.exit(exitCode);
+
+    const error: CrawlError = new Error(status) as CrawlError;
+    error.exitCode = exitCode;
+    this._reject(error);
   }
 
-  async serializeAndExit() {
+  async serializeAndAbort() {
     await this.serializeConfig();
 
     if (this.interrupted) {
       await this.browser.close();
       await closeWorkers(0);
       await this.closeFiles();
-      await this.setStatusAndExit(13, "interrupted");
+      await this._setStatusAndFail(13, "interrupted");
     } else {
-      await this.setStatusAndExit(0, "done");
+      this._complete({ finished: false });
     }
   }
 
-  async isCrawlRunning() {
+  async isCrawlRunning(): Promise<boolean> {
     if (this.interrupted) {
       return false;
     }
 
     if (await this.crawlState.isCrawlCanceled()) {
-      await this.setStatusAndExit(0, "canceled");
       return false;
     }
 
