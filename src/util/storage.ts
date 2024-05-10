@@ -205,7 +205,7 @@ export async function checkDiskUtilization(
   dfOutput = null,
 ) {
   const diskUsage: Record<string, string> = await getDiskUsage(
-    "/crawls",
+    params.cwd,
     dfOutput,
   );
   const usedPercentage = parseInt(diskUsage["Use%"].slice(0, -1));
@@ -260,13 +260,13 @@ export async function checkDiskUtilization(
   };
 }
 
-export async function getDFOutput(path: string) {
+async function getDFOutput(path: string) {
   const exec = util.promisify(child_process.exec);
   const res = await exec(`df ${path}`);
   return res.stdout;
 }
 
-export async function getDiskUsage(path = "/crawls", dfOutput = null) {
+async function getDiskUsage(path: string, dfOutput = null) {
   const result = dfOutput || (await getDFOutput(path));
   const lines = result.split("\n");
   const keys = lines[0].split(/\s+/gi);

@@ -17,6 +17,7 @@ test("ensure calculatePercentageUsed returns expected values", () => {
 
 test("verify end-to-end disk utilization not exceeded threshold", async () => {
   const params = {
+    cwd: '/crawls',
     diskUtilization: 90,
     combineWARC: true,
     generateWACZ: true,
@@ -43,6 +44,7 @@ grpcfuse       1000000      285000    715000  28% /crawls`;
 
 test("verify end-to-end disk utilization exceeds threshold", async () => {
   const params = {
+    cwd: '/crawls',
     diskUtilization: 90,
     combineWARC: false,
     generateWACZ: true,
