@@ -18,7 +18,12 @@ import puppeteer, {
   PuppeteerLaunchOptions,
   Viewport,
 } from "puppeteer-core";
-import { CDPSession, Target, Browser as PptrBrowser } from "puppeteer-core";
+import {
+  CDPSession,
+  Protocol,
+  Target,
+  Browser as PptrBrowser,
+} from "puppeteer-core";
 import { Recorder } from "./recorder.js";
 
 type BtrixChromeOpts = {
@@ -70,7 +75,7 @@ export class Browser {
     swOpt = "disabled",
     ondisconnect = null,
     recording = true,
-  }: LaunchOpts) {
+  }: LaunchOpts): Promise<void> {
     if (this.isLaunched()) {
       return;
     }
@@ -119,11 +124,11 @@ export class Browser {
     await this._init(launchOpts, ondisconnect, recording);
   }
 
-  targetFilter(target: Target) {
-    const attach = !(!target.url() && target.type() === "other");
+  targetFilter(target: Protocol.Target.TargetInfo) {
+    const attach = !(!target.url && target.type === "other");
     logger.debug(
       "Target Filter",
-      { url: target.url(), type: target.type(), attach },
+      { url: target.url, type: target.type, attach },
       "browser",
     );
     return attach;
@@ -138,7 +143,8 @@ export class Browser {
     switch (this.swOpt) {
       case "disabled":
         logger.debug("Service Workers: always disabled", {}, "browser");
-        await page.setBypassServiceWorker(true);
+        // Disabled for puppeteer 19 backport
+        // await page.setBypassServiceWorker(true);
         break;
 
       case "disabled-if-profile":
@@ -148,7 +154,8 @@ export class Browser {
             {},
             "browser",
           );
-          await page.setBypassServiceWorker(true);
+          // Disabled for puppeteer 19 backport
+          // await page.setBypassServiceWorker(true);
         }
         break;
 
@@ -293,7 +300,7 @@ export class Browser {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let details: Record<string, any> = { frameUrl, ...logData };
 
-    if (!frameUrl || frame.detached) {
+    if (!frameUrl || frame.isDetached()) {
       logger.info(
         "Run Script Skipped, frame no longer attached or has no URL",
         details,
@@ -387,7 +394,14 @@ export class Browser {
     ondisconnect: Function | null = null,
     recording: boolean,
   ) {
-    this.browser = await puppeteer.launch(launchOpts);
+    try {
+      logger.debug("Launching puppeteer", launchOpts, "browser");
+      this.browser = await puppeteer.launch(launchOpts);
+      logger.debug("Launched puppeteer");
+    } catch (e) {
+      logger.error("Failed to launch puppetteer", { error: e }, "browser");
+      throw e;
+    }
 
     const target = this.browser.target();
 
