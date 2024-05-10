@@ -206,19 +206,6 @@ export class Crawler {
       `crawl-${new Date().toISOString().replace(/[^\d]/g, "")}.log`,
     );
 
-    const debugLogging = this.params.logging.includes("debug");
-    logger.setDebugLogging(debugLogging);
-    logger.setLogLevel(this.params.logLevel);
-    logger.setContext(this.params.logContext);
-    logger.setExcludeContext(this.params.logExcludeContext);
-
-    // if automatically restarts on error exit code,
-    // exit with 0 from fatal by default, to avoid unnecessary restart
-    // otherwise, exit with default fatal exit code
-    if (this.params.restartsOnError) {
-      logger.setDefaultFatalExitCode(0);
-    }
-
     logger.debug("Writing log to: " + this.logFilename, {}, "general");
 
     this.headers = {};

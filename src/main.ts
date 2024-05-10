@@ -70,6 +70,10 @@ const crawlSupport = new CrawlSupport({
   headless: params.headless,
   logging: params.logging,
   logDir: crawlSupportLogDir,
+  logLevel: params.logLevel,
+  logContext: params.logContext,
+  logExcludeContext: params.logExcludeContext,
+  restartsOnError: params.restartsOnError,
 });
 
 process.on("exit", () => {
