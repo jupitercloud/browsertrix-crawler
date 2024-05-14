@@ -177,16 +177,14 @@ class Logger {
     message: string,
     data = {},
     context: LogContext = "general",
-    exitCode = 0,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _exitCode = 0,
   ) {
-    exitCode = exitCode || this.fatalExitCode;
-    this.logAsJSON(`${message}. Quitting`, data, context, "fatal");
-
+    this.error(message, data, context);
     if (this.crawlState) {
-      this.crawlState.setStatus("failed").finally(process.exit(exitCode));
-    } else {
-      process.exit(exitCode);
+      this.crawlState.setStatus("failed");
     }
+    throw new Error("Fatal error: " + message, data);
   }
 }
 
