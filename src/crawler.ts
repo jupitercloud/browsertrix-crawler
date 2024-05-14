@@ -1393,6 +1393,7 @@ self.__bx_behaviors.selectMainBehavior();
       const params = [
         "-o",
         path.join(this.collDir, "indexes", "index.cdxj"),
+        "--sort",
         ...warcListFull,
       ];
       const indexResult = await this.awaitProcess(
