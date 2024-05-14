@@ -95,7 +95,7 @@ function cliOptions(): { [key: string]: Options } {
       type: "string",
       demandOption: true,
     },
-    
+
     crawlerToken: {
       describe: "Token for access to the crawler server.",
       type: "string",
