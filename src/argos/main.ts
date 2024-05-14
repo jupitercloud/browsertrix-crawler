@@ -13,6 +13,11 @@ async function handleTerminate(signame: string) {
 }
 process.on("SIGINT", () => handleTerminate("SIGINT"));
 process.on("SIGTERM", () => handleTerminate("SIGTERM"));
+process.on("uncaughtException", (error, origin) => {
+  console.error(error);
+  logger.error("Uncaught exception", { error: error, origin: origin });
+  handleTerminate("uncaughtException");
+});
 
 await svc.initialize();
 
