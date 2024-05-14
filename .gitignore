@@ -10,4 +10,5 @@ dist
 scratch/
 venv/
 docs/venv/
+.direnv
 .yarn
