@@ -23,7 +23,7 @@ import {
 } from "./logger.js";
 
 // ============================================================================
-class ArgParser {
+export class ArgParser {
   get cliOpts(): { [key: string]: Options } {
     const coerce = (array: string[]) => {
       return array.flatMap((v) => v.split(",")).filter((x) => !!x);
@@ -557,7 +557,7 @@ class ArgParser {
     };
   }
 
-  parseArgs(argvParams?: string[], isQA = false) {
+  parseArgs(argvParams?: string[], isQA = false, exitOnError = true) {
     let argv = argvParams || process.argv;
 
     const envArgs =
@@ -572,6 +572,7 @@ class ArgParser {
     let origConfig = {};
 
     const parsed = yargs(hideBin(argv))
+      .exitProcess(exitOnError)
       .usage("crawler [options]")
       .option(this.cliOpts)
       .config(
@@ -704,5 +705,5 @@ class ArgParser {
 }
 
 export function parseArgs(argv?: string[], isQA = false) {
-  return new ArgParser().parseArgs(argv, isQA);
+  return new ArgParser().parseArgs(argv, isQA, true);
 }
