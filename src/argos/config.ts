@@ -10,6 +10,8 @@ import {
 export interface ArgosConfig extends CrawlSupportParams {
   cwd: string;
   redisStoreUrl: string | undefined;
+  crawlerServer: string;
+  crawlerToken: string;
 }
 
 const coerce = (array: string[]) => {
@@ -86,6 +88,18 @@ function cliOptions(): { [key: string]: Options } {
         "If set, url for remote redis server to store state. Otherwise, an embedded redis is launched.",
       type: "string",
       default: undefined,
+    },
+    
+    crawlerServer: {
+      describe: "URL to the crawler server.",
+      type: "string",
+      demandOption: true,
+    },
+    
+    crawlerToken: {
+      describe: "Token for access to the crawler server.",
+      type: "string",
+      demandOption: true,
     },
   };
 }
