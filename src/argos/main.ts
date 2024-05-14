@@ -25,6 +25,6 @@ svc
   .run()
   .then(() => process.exit(0))
   .catch((error: Error) => {
-    logger.fatal("Critical Argos error", { error: error });
+    logger.error("Critical Argos error", { error: error });
     process.exit(1);
   });

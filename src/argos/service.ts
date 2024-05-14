@@ -1,7 +1,12 @@
 import { ArgosConfig } from "./config.js";
 import { CrawlSupport } from "../crawlsupport.js";
 import { logger } from "../util/logger.js";
+import * as crawlerArgs from "../util/argParser.js";
 import axios from "axios";
+import fs from "fs";
+import yaml from "js-yaml";
+import path from "path";
+import { Crawler } from "../crawler.js";
 
 interface CrawlJob {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,7 +81,6 @@ export class ArgosService {
         logger.debug("No crawl job available");
         return null;
       }
-      logger.debug("Job received", { job: data });
       return data;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
@@ -86,7 +90,52 @@ export class ArgosService {
   }
 
   private async _executeCrawl(crawlJob: CrawlJob): Promise<void> {
-    return this._failCrawl(crawlJob, new Error("Crawl not implemented"));
+    logger.info("Running crawl job", crawlJob);
+    const { crawlId } = crawlJob.config;
+    const configPath = path.join(this._config.cwd, crawlId + "-config.yaml");
+    let error: Error | null = null;
+    try {
+      fs.writeFileSync(configPath, yaml.dump(crawlJob.config), {
+        encoding: "utf8",
+      });
+      const argParser = new crawlerArgs.ArgParser();
+      const args = argParser.parseArgs(
+        ["node", "crawler", "--config", configPath],
+        false,
+        false,
+      );
+      const crawler = new Crawler(
+        args.parsed,
+        args.origConfig,
+        this._crawlSupport,
+      );
+      await crawler.run();
+    } catch (_error) {
+      error = _error as Error;
+    } finally {
+      if (fs.existsSync(configPath)) {
+        fs.unlinkSync(configPath);
+      }
+    }
+    if (error) {
+      return this._failCrawl(crawlJob, error as Error);
+    }
+    return this._completeCrawl(crawlJob);
+  }
+
+  private async _completeCrawl(crawlJob: CrawlJob): Promise<void> {
+    const crawlParams = {
+      "crawl-id": crawlJob.config.crawlId,
+    };
+    logger.info("Completed crawl job", crawlParams);
+    return axios
+      .post(
+        `${this._config.crawlerServer}/complete`,
+        crawlParams,
+        this._requestOptions(),
+      )
+      .then(() => undefined)
+      .catch((e) => logger.error("Failed to report crawl error", { error: e }));
   }
 
   private async _failCrawl(crawlJob: CrawlJob, reason: Error): Promise<void> {
