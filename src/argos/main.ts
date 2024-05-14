@@ -1,14 +1,11 @@
 #!/usr/bin/env -S node --experimental-global-webcrypto
 
 import { logger } from "../util/logger.js";
-import { parseArgs } from "../util/argParser.js";
+import { parseArgs } from "./config.js";
 import { ArgosService } from "./service.js";
 
-const args = parseArgs();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const params = args.parsed as any;
-
-const svc: ArgosService = new ArgosService({ params: params });
+const config = parseArgs(process.argv);
+const svc: ArgosService = new ArgosService(config);
 
 async function handleTerminate(signame: string) {
   logger.info(`${signame} received...`);
