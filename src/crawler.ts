@@ -30,12 +30,7 @@ import {
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
 import { logger, formatErr, LogDetails } from "./util/logger.js";
-import {
-  WorkerOpts,
-  WorkerState,
-  closeWorkers,
-  runWorkers,
-} from "./util/worker.js";
+import { WorkerOpts, WorkerState, WorkerGroup } from "./util/worker.js";
 import { sleep, timedRun, secondsElapsed } from "./util/timing.js";
 import { collectAllFileSources, getInfoString } from "./util/file_reader.js";
 
@@ -203,6 +198,8 @@ export class Crawler {
   private _reject: (r: CrawlError) => void = undefined as unknown as (
     r: CrawlError,
   ) => void;
+
+  private _workerGroup: WorkerGroup | null = null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(params: any, origConfig: any, crawlSupport: CrawlSupport) {
@@ -1140,7 +1137,7 @@ self.__bx_behaviors.selectMainBehavior();
 
     if (this.interrupted) {
       await this.browser.close();
-      await closeWorkers(0);
+      this._workerGroup?.abort();
       await this.closeFiles();
       await this._setStatusAndFail(13, "interrupted");
     } else {
@@ -1278,10 +1275,16 @@ self.__bx_behaviors.selectMainBehavior();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
+    this._workerGroup = new WorkerGroup(
+      this,
+      this.params.workers,
+      this.maxPageTime,
+    );
     // --------------
     // Run Crawl Here!
-    await runWorkers(this, this.params.workers, this.maxPageTime);
+    await this._workerGroup.run();
     // --------------
+    await this.browser.close();
 
     await this.serializeConfig(true);
 
