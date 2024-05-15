@@ -276,7 +276,7 @@ export class Crawler {
     // archives dir
     this.archivesDir = path.join(this.collDir, "archive");
     this.tempdir = path.join(os.tmpdir(), "tmp-dl");
-    this.tempCdxDir = path.join(this.collDir, "tmp-cdx");
+    this.tempCdxDir = path.join(os.tmpdir(), "tmp-cdx");
 
     this.screenshotWriter = null;
     this.textWriter = null;
