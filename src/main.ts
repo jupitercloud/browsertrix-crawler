@@ -74,11 +74,8 @@ const crawlSupport = new CrawlSupport({
   logLevel: params.logLevel,
   logContext: params.logContext,
   logExcludeContext: params.logExcludeContext,
+  redisStoreUrl: params.redisStoreUrl,
   restartsOnError: params.restartsOnError,
-});
-
-process.on("exit", () => {
-  crawlSupport.shutdown();
 });
 
 await crawlSupport.initialize();
@@ -92,9 +89,9 @@ if (process.argv[1].endsWith("qa")) {
 crawler
   .run()
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  .then((_result: CrawlResult) => {
-    process.exit(0);
+  .then(async (_result: CrawlResult) => {
+    crawlSupport.shutdown().finally(() => process.exit(0));
   })
-  .catch((error: CrawlError) => {
-    process.exit(error.exitCode);
+  .catch(async (error: CrawlError) => {
+    crawlSupport.shutdown().finally(() => process.exit(error.exitCode));
   });

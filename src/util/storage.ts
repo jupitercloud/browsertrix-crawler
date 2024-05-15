@@ -10,11 +10,11 @@ import crc32 from "crc/crc32";
 
 import * as Minio from "minio";
 
-import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
 
 // @ts-expect-error TODO fill in why error is expected
 import getFolderSize from "get-folder-size";
+import { Redis } from "ioredis";
 
 // ===========================================================================
 export class S3StorageSync {
@@ -154,8 +154,14 @@ export class S3StorageSync {
             "redis",
           );
         }
-        const redis = await initRedis(parts.slice(0, 4).join("/"));
-        await redis.rpush(parts[4], JSON.stringify(body));
+        const redisUrl = parts.slice(0, 4).join("/");
+        const redis = new Redis(redisUrl, { lazyConnect: true });
+        await redis.connect();
+        try {
+          await redis.rpush(parts[4], JSON.stringify(body));
+        } finally {
+          redis.quit();
+        }
       }
     }
   }

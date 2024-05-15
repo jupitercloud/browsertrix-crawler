@@ -29,7 +29,6 @@ import {
 } from "./util/storage.js";
 import { ScreenCaster, WSTransport } from "./util/screencaster.js";
 import { Screenshots } from "./util/screenshots.js";
-import { initRedis } from "./util/redis.js";
 import { logger, formatErr, LogDetails } from "./util/logger.js";
 import {
   WorkerOpts,
@@ -322,29 +321,8 @@ export class Crawler {
   }
 
   async initCrawlState() {
-    const redisUrl = this.params.redisStoreUrl || "redis://localhost:6379/0";
-
-    if (!redisUrl.startsWith("redis://")) {
-      logger.fatal(
-        "stateStoreUrl must start with redis:// -- Only redis-based store currently supported",
-      );
-    }
-
-    let redis;
-
-    while (true) {
-      try {
-        redis = await initRedis(redisUrl);
-        break;
-      } catch (e) {
-        //logger.fatal("Unable to connect to state store Redis: " + redisUrl);
-        logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
-        await sleep(1);
-      }
-    }
-
     logger.debug(
-      `Storing state via Redis ${redisUrl} @ key prefix "${this.crawlId}"`,
+      `Storing state via Redis @ key prefix "${this.crawlId}"`,
       {},
       "state",
     );
@@ -352,7 +330,7 @@ export class Crawler {
     logger.debug(`Max Page Time: ${this.maxPageTime} seconds`, {}, "state");
 
     this.crawlState = new RedisCrawlState(
-      redis,
+      this.crawlSupport.redis,
       this.params.crawlId,
       this.maxPageTime,
       os.hostname(),

@@ -3,11 +3,11 @@ import http, { IncomingMessage, ServerResponse } from "http";
 import url from "url";
 import fs from "fs";
 
-import { initRedis } from "./redis.js";
 import { logger } from "./logger.js";
 import { Duplex } from "stream";
 import { CDPSession, Page } from "puppeteer-core";
 import { WorkerId } from "./state.js";
+import { Redis } from "ioredis";
 
 const indexHTML = fs.readFileSync(
   new URL("../../html/screencast.html", import.meta.url),
@@ -111,25 +111,20 @@ class RedisPubSubTransport {
   // eslint-disable-next-line no-use-before-define
   caster!: ScreenCaster;
   ctrlChannel: string;
-  // TODO: Fix this the next time the file is edited.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  redis: any;
+  redis: Redis;
 
-  constructor(redisUrl: string, crawlId: string) {
+  constructor(redis: Redis, crawlId: string) {
+    this.redis = redis;
     this.castChannel = `c:${crawlId}:cast`;
     this.ctrlChannel = `c:${crawlId}:ctrl`;
 
-    this.init(redisUrl);
+    this.init();
   }
 
-  async init(redisUrl: string) {
-    this.redis = await initRedis(redisUrl);
+  async init() {
+    await this.redis.subscribe(this.ctrlChannel);
 
-    const subRedis = await initRedis(redisUrl);
-
-    await subRedis.subscribe(this.ctrlChannel);
-
-    subRedis.on("message", async (channel: string, message: string) => {
+    this.redis.on("message", async (channel: string, message: string) => {
       if (channel !== this.ctrlChannel) {
         return;
       }
@@ -163,7 +158,10 @@ class RedisPubSubTransport {
   }
 
   async isActive() {
-    const result = await this.redis.pubsub("numsub", this.castChannel);
+    const result = (await this.redis.pubsub(
+      "NUMSUB",
+      this.castChannel,
+    )) as number[];
     return result.length > 1 ? result[1] > 0 : false;
   }
 }
