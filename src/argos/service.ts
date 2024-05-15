@@ -113,7 +113,13 @@ export class ArgosService {
         args.origConfig,
         this._crawlSupport,
       );
-      await crawler.run();
+      // Clear crawl state before and after execution to
+      // 1. Ensure crawl retries run from a fresh start
+      // 2. Clean up redis after use
+      await crawler
+        .resetCrawlState()
+        .then(() => crawler.run())
+        .finally(() => crawler.resetCrawlState());
     } catch (_error) {
       error = _error as Error;
     } finally {
