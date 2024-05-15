@@ -5,6 +5,7 @@ import fsp from "fs/promises";
 import { LogContext, logger } from "./util/logger.js";
 
 export interface CrawlSupportParams {
+  cwd: string;
   debugAccessRedis: boolean;
   headless: boolean;
   logging: string[];
@@ -27,7 +28,7 @@ export class CrawlSupport {
     this.runDetached = process.env.DETACHED_CHILD_PROC == "1";
   }
 
-  private launchRedis() {
+  private async launchRedis() {
     let redisStdio: StdioOptions;
 
     if (this.params.logging.includes("redis")) {
@@ -45,8 +46,11 @@ export class CrawlSupport {
       redisArgs = ["--protected-mode", "no"];
     }
 
+    const redisData = path.join(this.params.cwd, "redis");
+    await fsp.mkdir(redisData, { recursive: true });
+
     return child_process.spawn("redis-server", redisArgs, {
-      cwd: "/tmp/",
+      cwd: redisData,
       stdio: redisStdio,
       detached: this.runDetached,
     });
@@ -71,7 +75,7 @@ export class CrawlSupport {
     this._initializeLogging();
     logger.debug("Initializing CrawlSupport", {}, "general");
     await fsp.mkdir(this.params.logDir, { recursive: true });
-    this.subprocesses.push(this.launchRedis());
+    this.subprocesses.push(await this.launchRedis());
 
     this.subprocesses.push(
       child_process.spawn(

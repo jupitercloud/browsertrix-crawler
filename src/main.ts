@@ -66,6 +66,7 @@ const crawlSupportLogDir = path.join(
 );
 
 const crawlSupport = new CrawlSupport({
+  cwd: params.cwd,
   debugAccessRedis: params.debugAccessRedis,
   headless: params.headless,
   logging: params.logging,
