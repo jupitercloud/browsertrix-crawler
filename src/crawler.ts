@@ -226,7 +226,7 @@ export class Crawler {
     // pages file
     this.pagesFH = null;
 
-    this.crawlId = process.env.CRAWL_ID || os.hostname();
+    this.crawlId = this.params.crawlId || process.env.CRAWL_ID || os.hostname();
 
     this.startTime = Date.now();
 
