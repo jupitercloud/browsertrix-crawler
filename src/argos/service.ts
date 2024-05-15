@@ -59,11 +59,15 @@ export class ArgosService {
 
   async shutdown(): Promise<void> {
     logger.info("Shutting down Argos");
-    this._runSwitch = false;
     while (!this._terminated) {
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
     await this._crawlSupport.shutdown();
+  }
+
+  // Signal the process to gracefully stop. Call shutdown() subsequently to wait for completion.
+  stop(): void {
+    this._runSwitch = false;
   }
 
   private _requestOptions() {

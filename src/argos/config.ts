@@ -89,7 +89,7 @@ function cliOptions(): { [key: string]: Options } {
       type: "string",
       default: undefined,
     },
-    
+
     crawlerServer: {
       describe: "URL to the crawler server.",
       type: "string",

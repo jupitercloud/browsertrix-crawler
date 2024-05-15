@@ -9,7 +9,7 @@ const svc: ArgosService = new ArgosService(config);
 
 async function handleTerminate(signame: string) {
   logger.info(`${signame} received...`);
-  svc?.shutdown();
+  svc.stop();
 }
 process.on("SIGINT", () => handleTerminate("SIGINT"));
 process.on("SIGTERM", () => handleTerminate("SIGTERM"));
@@ -23,8 +23,8 @@ await svc.initialize();
 
 svc
   .run()
-  .then(() => process.exit(0))
-  .catch((error: Error) => {
+  .then(async () => svc.shutdown().finally(() => process.exit(0)))
+  .catch(async (error: Error) => {
     logger.error("Critical Argos error", { error: error });
-    process.exit(1);
+    return svc.shutdown().finally(() => process.exit(1));
   });
