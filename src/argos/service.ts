@@ -2,7 +2,9 @@ import { ArgosConfig } from "./config.js";
 import { CrawlSupport } from "../crawlsupport.js";
 import { logger } from "../util/logger.js";
 import * as crawlerArgs from "../util/argParser.js";
+import type { AxiosRequestConfig } from "axios";
 import axios from "axios";
+import FormData from "form-data";
 import fs from "fs";
 import yaml from "js-yaml";
 import path from "path";
@@ -11,6 +13,46 @@ import { Crawler } from "../crawler.js";
 interface CrawlJob {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config: any; // Browsertix crawl config
+}
+
+const contentMetadata: Array<[RegExp, string]> = [
+  [/\.cdxj$/i, "application/cdxj"],
+  [/\.gz/i, "application/gzip"],
+  [/\.json$/i, "application/json"],
+  [/\.jsonl$/i, "application/jsonlines"],
+  [/\.yaml$|\.yml$/i, "application/yaml"],
+  [/\.warc$/i, "application/warc"],
+  [/\.jpg$|\.jpeg$/i, "image/jpeg"],
+  [/\.png$/i, "image/png"],
+  [/\.log/i, "text/plain"],
+  [/\.html$/i, "text/html"],
+];
+
+function getContentType(filename: string): string {
+  for (const [pattern, contentType] of contentMetadata) {
+    if (pattern.test(filename)) {
+      return contentType;
+    }
+  }
+  return "application/octet-stream";
+}
+
+function getFilesRecursively(directory: string): string[] {
+  let results: string[] = [];
+  const list = fs.readdirSync(directory);
+
+  list.forEach((file) => {
+    const filePath = path.join(directory, file);
+    const stat = fs.statSync(filePath);
+
+    if (stat && stat.isDirectory()) {
+      results = results.concat(getFilesRecursively(filePath));
+    } else {
+      results.push(filePath);
+    }
+  });
+
+  return results;
 }
 
 export class ArgosService {
@@ -70,7 +112,7 @@ export class ArgosService {
     this._runSwitch = false;
   }
 
-  private _requestOptions() {
+  private _requestOptions(): AxiosRequestConfig {
     return { headers: { Authorization: this._config.crawlerToken } };
   }
 
@@ -120,6 +162,7 @@ export class ArgosService {
         .resetCrawlState()
         .then(() => crawler.run())
         .finally(() => crawler.resetCrawlState());
+      await this._uploadArtifacts(crawler, configPath);
     } catch (_error) {
       error = _error as Error;
     } finally {
@@ -131,6 +174,39 @@ export class ArgosService {
       return this._failCrawl(crawlJob, error as Error);
     }
     return this._completeCrawl(crawlJob);
+  }
+
+  private async _uploadArtifact(crawlId: string, file: string): Promise<void> {
+    const contentType = getContentType(file);
+    const form = new FormData();
+    form.append("crawl-id", crawlId);
+    form.append("artifact", fs.createReadStream(file), {
+      filename: path.basename(file),
+      contentType,
+    });
+
+    const options = this._requestOptions();
+    options.headers = { ...options.headers, ...form.getHeaders() };
+
+    try {
+      await axios.post(`${this._config.crawlerServer}/artifact`, form, options);
+      logger.debug(`Uploaded artifact ${file}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      logger.warn(`Upload artifact failed: ${error.message}`, { error, file });
+      throw error;
+    }
+  }
+
+  private async _uploadArtifacts(
+    crawler: Crawler,
+    configPath: string,
+  ): Promise<void> {
+    const crawlId = crawler.crawlId;
+    const files = getFilesRecursively(crawler.collDir);
+    files.push(configPath);
+    logger.debug("Uploading artifact files", { crawlId, files });
+    await Promise.all(files.map((file) => this._uploadArtifact(crawlId, file)));
   }
 
   private async _completeCrawl(crawlJob: CrawlJob): Promise<void> {
