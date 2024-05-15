@@ -1,7 +1,7 @@
 #!/usr/bin/env -S node --experimental-global-webcrypto
 
 import path from "path";
-import { logger } from "./util/logger.js";
+import { logger, interceptIoRedisLog } from "./util/logger.js";
 import { parseArgs } from "./util/argParser.js";
 import type { CrawlError, CrawlResult } from "./crawler.js";
 import { Crawler } from "./crawler.js";
@@ -43,6 +43,9 @@ async function handleTerminate(signame: string) {
     logger.error("Error stopping crawl after receiving termination signal", e);
   }
 }
+
+// Install middleware to the global console logger
+interceptIoRedisLog();
 
 const args = parseArgs();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

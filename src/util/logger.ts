@@ -190,7 +190,7 @@ class Logger {
 
 export const logger = new Logger();
 
-function tapRedisLog() {
+export function interceptIoRedisLog() {
   const error = console.error;
   let lastLogTime = 0;
   // log only once every 10 seconds
@@ -215,5 +215,3 @@ function tapRedisLog() {
     error.call(console, ...args);
   };
 }
-
-tapRedisLog();
