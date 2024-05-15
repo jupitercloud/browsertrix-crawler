@@ -634,14 +634,23 @@ return 0;
     return results;
   }
 
+  async reset() {
+    await Promise.all([
+      this.redis.del(this.qkey),
+      this.redis.del(this.pkey),
+      this.redis.del(this.skey),
+      this.redis.del(this.dkey),
+      this.redis.del(this.fkey),
+      this.redis.del(this.ekey),
+      this.redis.del(this.pageskey),
+      this.redis.del(this.esKey),
+      this.redis.del(this.sitemapDoneKey),
+    ]);
+  }
+
   async load(state: SaveState, seeds: ScopedSeed[], checkScope: boolean) {
     // need to delete existing keys, if exist to fully reset state
-    await this.redis.del(this.qkey);
-    await this.redis.del(this.pkey);
-    await this.redis.del(this.dkey);
-    await this.redis.del(this.fkey);
-    await this.redis.del(this.skey);
-    await this.redis.del(this.ekey);
+    await this.reset();
 
     let seen: string[] = [];
 

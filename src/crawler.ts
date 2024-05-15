@@ -256,6 +256,8 @@ export class Crawler {
       PAGE_OP_TIMEOUT_SECS * 2 +
       this.params.pageExtraDelay;
 
+    logger.debug(`Max Page Time: ${this.maxPageTime} seconds`, {}, "state");
+
     this.emulateDevice = this.params.emulateDevice || {};
 
     //this.captureBasePrefix = `http://${process.env.PROXY_HOST}:${process.env.PROXY_PORT}/${this.params.collection}/record`;
@@ -298,6 +300,19 @@ export class Crawler {
     this.customBehaviors = "";
 
     this.browser = new Browser();
+
+    logger.debug(
+      `Storing state via Redis @ key prefix "${this.crawlId}"`,
+      {},
+      "state",
+    );
+
+    this.crawlState = new RedisCrawlState(
+      this.crawlSupport.redis,
+      this.params.crawlId,
+      this.maxPageTime,
+      os.hostname(),
+    );
   }
 
   configureUA() {
@@ -320,22 +335,12 @@ export class Crawler {
     return this.emulateDevice.userAgent;
   }
 
-  async initCrawlState() {
-    logger.debug(
-      `Storing state via Redis @ key prefix "${this.crawlId}"`,
-      {},
-      "state",
-    );
+  // Clear the crawl state for this crawlId
+  public async resetCrawlState() {
+    return this.crawlState.reset();
+  }
 
-    logger.debug(`Max Page Time: ${this.maxPageTime} seconds`, {}, "state");
-
-    this.crawlState = new RedisCrawlState(
-      this.crawlSupport.redis,
-      this.params.crawlId,
-      this.maxPageTime,
-      os.hostname(),
-    );
-
+  private async loadCrawlState() {
     // load full state from config
     if (this.params.state) {
       await this.crawlState.load(
@@ -364,7 +369,7 @@ export class Crawler {
       logger.setCrawlState(this.crawlState);
     }
 
-    return this.crawlState;
+    return this.crawlState.getStatus();
   }
 
   async loadExtraSeeds() {
@@ -1176,9 +1181,7 @@ self.__bx_behaviors.selectMainBehavior();
       return;
     }
 
-    await this.initCrawlState();
-
-    let initState = await this.crawlState.getStatus();
+    let initState = await this.loadCrawlState();
 
     while (initState === "debug") {
       logger.info("Paused for debugging, will continue after manual resume");
