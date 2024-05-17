@@ -12,6 +12,7 @@ export interface ArgosConfig extends CrawlSupportParams {
   redisStoreUrl: string | undefined;
   crawlerServer: string;
   crawlerToken: string;
+  crawlLimit: number | undefined;
 }
 
 const coerce = (array: string[]) => {
@@ -100,6 +101,12 @@ function cliOptions(): { [key: string]: Options } {
       describe: "Token for access to the crawler server.",
       type: "string",
       demandOption: true,
+    },
+
+    crawlLimit: {
+      describe: "Limit to n jobs before exiting the program.",
+      type: "number",
+      default: undefined,
     },
   };
 }

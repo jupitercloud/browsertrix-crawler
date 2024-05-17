@@ -88,9 +88,14 @@ export class ArgosService {
     logger.info("Running Argos");
     this._runSwitch = true;
     this._terminated = false;
-    while (this._runSwitch) {
+    let crawlCount = 0;
+    while (
+      this._runSwitch &&
+      (!this._config.crawlLimit || crawlCount < this._config.crawlLimit)
+    ) {
       const crawlJob = await this._receiveJob();
       if (crawlJob) {
+        crawlCount++;
         await this._executeCrawl(crawlJob);
       } else {
         await new Promise((resolve) => setTimeout(resolve, 5000));
