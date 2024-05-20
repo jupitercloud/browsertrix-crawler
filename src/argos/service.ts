@@ -79,9 +79,10 @@ export class ArgosService {
     this._terminated = true;
   }
 
-  async initialize(): Promise<void> {
+  async initialize(): Promise<ArgosService> {
     logger.info("Initializing Argos", { config: this._config });
     await this._crawlSupport.initialize();
+    return this;
   }
 
   async run(): Promise<void> {
@@ -104,12 +105,13 @@ export class ArgosService {
     this._terminated = true;
   }
 
-  async shutdown(): Promise<void> {
+  async shutdown(): Promise<ArgosService> {
     logger.info("Shutting down Argos");
     while (!this._terminated) {
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
     await this._crawlSupport.shutdown();
+    return this;
   }
 
   // Signal the process to gracefully stop. Call shutdown() subsequently to wait for completion.

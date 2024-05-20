@@ -19,10 +19,9 @@ process.on("uncaughtException", (error, origin) => {
   handleTerminate("uncaughtException");
 });
 
-await svc.initialize();
-
 svc
-  .run()
+  .initialize()
+  .then((svc) => svc.run())
   .then(async () => svc.shutdown().finally(() => process.exit(0)))
   .catch(async (error: Error) => {
     logger.error("Critical Argos error", { error: error });
