@@ -28,6 +28,11 @@ export class CrawlSupport {
 
   constructor(params: CrawlSupportParams) {
     const redisUrl = params.redisStoreUrl || "redis://localhost:6379/0";
+    if (!redisUrl.startsWith("redis://")) {
+      logger.fatal(
+        "redisStoreUrl must start with redis:// -- Only redis-based store currently supported",
+      );
+    }
     this._params = params;
     this._runDetached = process.env.DETACHED_CHILD_PROC == "1";
     this._redis = new Redis(redisUrl, { lazyConnect: true });
@@ -70,23 +75,27 @@ export class CrawlSupport {
   }
 
   private async _connectRedis() {
-    const redisUrl = this._params.redisStoreUrl || "redis://localhost:6379/0";
-
-    if (!redisUrl.startsWith("redis://")) {
-      logger.fatal(
-        "redisStoreUrl must start with redis:// -- Only redis-based store currently supported",
-      );
-    }
-
-    while (true) {
+    let init = true;
+    for (
+      const timeoutAt = Date.now() + 10000;
+      Date.now() < timeoutAt;
+      init = false
+    ) {
       try {
-        await this._redis.connect();
-        break;
+        if (init) {
+          await this._redis.connect();
+        } else {
+          // Disconnect and reconnect
+          await this._redis.disconnect(true);
+        }
+        logger.debug("Connected to redis");
+        return;
       } catch (e) {
-        logger.warn(`Waiting for redis at ${redisUrl}`, {}, "state");
+        logger.warn(`Waiting for redis connection`, {}, "state");
         await sleep(1);
       }
     }
+    throw new Error("Redis connection timeout");
   }
 
   private _initializeLogging() {
@@ -106,9 +115,10 @@ export class CrawlSupport {
 
   async initialize() {
     this._initializeLogging();
-    logger.debug("Initializing CrawlSupport", {}, "general");
+    logger.debug("Initializing CrawlSupport", this._params, "general");
     await fsp.mkdir(this._params.logDir, { recursive: true });
     if (!this._params.redisStoreUrl) {
+      logger.debug("Launching redis");
       this._subprocesses.push(await this._launchRedis());
     }
 
